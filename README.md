@@ -16,7 +16,7 @@
 [**Interactive 3D model**](https://hersheyharshi.github.io/espira/model.html) ·
 [**Technical paper (PDF)**](ESPIRA_technical_note.pdf) ·
 [**Analysis code**](analysis/espira_feasibility.py)
-
+[![DOI](https://zenodo.org/badge/1453665188.svg)](https://doi.org/10.5281/zenodo.24129056)
 ![Status](https://img.shields.io/badge/status-concept%20study-d9b36c?style=flat-square)
 ![TRL](https://img.shields.io/badge/TRL-1--2-555?style=flat-square)
 ![Python](https://img.shields.io/badge/analysis-Python%203-3776AB?style=flat-square)
