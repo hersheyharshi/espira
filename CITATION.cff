@@ -6,7 +6,7 @@ authors:
   - family-names: Pandita
     given-names: Harshita
 version: 1.0.0
-[![DOI](https://zenodo.org/badge/1453665188.svg)](https://doi.org/10.5281/zenodo.24129056)
+doi: 10.5281/zenodo.1234567
 date-released: 2026-11-11
 url: "https://hersheyharshi.github.io/espira/"
 repository-code: "https://github.com/hersheyharshi/espira"
