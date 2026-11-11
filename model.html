@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ESPIRA — Interactive Spacecraft Model · Harshita Pandita</title>
+<meta name="author" content="Harshita Pandita">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  :root { --fg:#e8eaed; --dim:#8a9099; --faint:#565c66; --line:rgba(255,255,255,.12); --panel:rgba(12,14,18,.72); --accent:#d9b36c; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#000; color:var(--fg); font-family:Inter,system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  canvas#c { position:fixed; inset:0; width:100%; height:100%; display:block; outline:none; }
+  svg#leaders { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
+  #labels { position:fixed; inset:0; pointer-events:none; }
+  .lbl { position:absolute; font-size:11px; font-weight:500; letter-spacing:.04em; color:var(--fg); white-space:nowrap; transform:translate(0,-50%); text-shadow:0 1px 3px #000; transition:opacity .3s; }
+  .lbl.v2::before { content:'V2 '; color:var(--accent); font-weight:600; }
+  header { position:fixed; left:28px; top:24px; pointer-events:none; }
+  header h1 { font-weight:500; font-size:15px; letter-spacing:.32em; }
+  header p { font-size:11.5px; color:var(--dim); margin-top:6px; letter-spacing:.02em; }
+  aside { position:fixed; right:20px; top:20px; bottom:20px; width:300px; display:flex; flex-direction:column; gap:12px; pointer-events:none; }
+  .card { background:var(--panel); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border:1px solid var(--line); border-radius:10px; pointer-events:auto; }
+  .list { padding:10px 6px; overflow-y:auto; max-height:48vh; }
+  .grp { font-size:10px; letter-spacing:.14em; color:var(--faint); padding:8px 12px 4px; text-transform:uppercase; }
+  .item { display:flex; justify-content:space-between; align-items:center; padding:7px 12px; border-radius:6px; font-size:12.5px; color:#c9ccd1; cursor:pointer; }
+  .item:hover { background:rgba(255,255,255,.05); color:#fff; }
+  .item.on { background:rgba(217,179,108,.12); color:#fff; }
+  .item small { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--faint); }
+  .info { padding:16px 18px; display:none; }
+  .info.show { display:block; }
+  .info .tag { font-size:10px; letter-spacing:.14em; color:var(--accent); text-transform:uppercase; }
+  .info h2 { font-size:15px; font-weight:500; margin:6px 0 8px; }
+  .info p { font-size:12px; line-height:1.55; color:#b6bac1; }
+  .info table { width:100%; margin-top:12px; border-collapse:collapse; font-size:11.5px; }
+  .info td { padding:5px 0; border-top:1px solid var(--line); color:var(--dim); }
+  .info td:last-child { text-align:right; color:var(--fg); font-family:'JetBrains Mono',monospace; font-size:11px; }
+  .info .note { margin-top:10px; font-size:10.5px; color:var(--faint); }
+  nav { position:fixed; left:50%; bottom:22px; transform:translateX(-50%); display:flex; gap:4px; padding:5px; }
+  nav button { background:transparent; border:0; color:#aeb3ba; font:500 11.5px Inter,sans-serif; letter-spacing:.03em; padding:8px 14px; border-radius:6px; cursor:pointer; }
+  nav button:hover { color:#fff; background:rgba(255,255,255,.06); }
+  nav button.on { color:#fff; background:rgba(255,255,255,.1); }
+  footer { position:fixed; left:28px; bottom:26px; font-size:10.5px; color:var(--faint); line-height:1.5; pointer-events:none; }
+  #loading { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:#000; font-size:11px; letter-spacing:.3em; color:var(--dim); transition:opacity .8s; z-index:5; }
+  header .links { pointer-events:auto; margin-top:10px; } header a { color:var(--accent); text-decoration:none; font-size:11.5px; } header a:hover { text-decoration:underline; }
+  body.embed header, body.embed aside, body.embed nav, body.embed footer, body.embed #loading { display:none !important; }
+  body.embed.nolabels #labels, body.embed.nolabels #leaders { display:none; }
+  @media (max-width:760px){ aside{ top:auto; height:44vh; width:auto; left:12px; right:12px; bottom:70px; } .list{max-height:20vh} header{left:16px;top:16px} footer{display:none} nav{bottom:12px} .lbl{display:none} }
+</style>
+</head>
+<body>
+<script>if(new URLSearchParams(location.search).has('embed')){document.body.classList.add('embed');if(!new URLSearchParams(location.search).has('labels'))document.body.classList.add('nolabels');}</script>
+<canvas id="c"></canvas>
+<svg id="leaders"></svg>
+<div id="labels"></div>
+<div id="loading">ESPIRA</div>
+
+<header>
+  <h1>ESPIRA</h1>
+  <p>Electrostatic debris-removal spacecraft · concept study by Harshita Pandita</p>
+  <p class="links"><a href="index.html">← Project page</a> &nbsp;·&nbsp; <a href="ESPIRA_technical_note.pdf">Technical paper (PDF)</a></p>
+</header>
+
+<aside>
+  <div class="card list" id="list"></div>
+  <div class="card info" id="info"></div>
+</aside>
+
+<nav class="card">
+  <button id="bLabels" class="on">Labels</button>
+  <button id="bExplode">Exploded view</button>
+  <button id="bTether">Deploy tethers</button>
+  <button id="bRotate" class="on">Auto-rotate</button>
+  <button id="bReset">Reset view</button>
+</nav>
+
+<footer>Concept visualisation · all values are design targets, not test results<br>~383 kg · 550 km sun-synchronous orbit · 1.4 kW array</footer>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+// ───────────────────────── renderer / scene ─────────────────────────
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x000000);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth/innerHeight, 0.05, 5000);
+const HOME_POS = new THREE.Vector3(7.5, 2.6, 8.5);
+camera.position.copy(HOME_POS);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true; controls.dampingFactor = 0.06;
+controls.minDistance = 3; controls.maxDistance = 40;
+controls.autoRotate = true; controls.autoRotateSpeed = 0.25;
+const EMBED = new URLSearchParams(location.search).has('embed');
+const EMBED_LABELS = new URLSearchParams(location.search).has('labels');
+if(EMBED){ document.body.classList.add('embed'); if(!EMBED_LABELS) document.body.classList.add('nolabels'); controls.enableZoom = false; controls.autoRotateSpeed = 0.35; }
+function applyViewOffset(){ if(EMBED && !EMBED_LABELS){ camera.setViewOffset(innerWidth, innerHeight, -innerWidth*0.2, 0, innerWidth, innerHeight); } }
+applyViewOffset();
+
+// Sun: one hard directional source, like real orbital photography
+const SUN_DIR = new THREE.Vector3(1.0, 0.55, 0.45).normalize();
+const sun = new THREE.DirectionalLight(0xfff4e6, 3.6);
+sun.position.copy(SUN_DIR).multiplyScalar(25);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left:-7, right:7, top:7, bottom:-7, near:1, far:60 });
+sun.shadow.camera.updateProjectionMatrix();
+sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.02;
+scene.add(sun);
+// Earthshine: weak, bluish, from below
+const earthshine = new THREE.DirectionalLight(0x6f8fbf, 0.35);
+earthshine.position.set(0, -10, -3);
+scene.add(earthshine);
+
+// ───────────────────────── procedural textures ─────────────────────────
+function hash3(x,y,z){ let h = x*374761393 + y*668265263 + z*2147483647; h = (h ^ (h>>>13)) * 1274126177; return ((h ^ (h>>>16)) >>> 0) / 4294967295; }
+function vnoise(x,y,z){
+  const xi=Math.floor(x), yi=Math.floor(y), zi=Math.floor(z);
+  const xf=x-xi, yf=y-yi, zf=z-zi;
+  const u=xf*xf*(3-2*xf), v=yf*yf*(3-2*yf), w=zf*zf*(3-2*zf);
+  const L=(a,b,t)=>a+(b-a)*t;
+  const c=(i,j,k)=>hash3(xi+i,yi+j,zi+k);
+  return L(L(L(c(0,0,0),c(1,0,0),u),L(c(0,1,0),c(1,1,0),u),v), L(L(c(0,0,1),c(1,0,1),u),L(c(0,1,1),c(1,1,1),u),v), w);
+}
+function fbm(x,y,z,oct=5){ let a=0.5,f=1,s=0; for(let i=0;i<oct;i++){ s+=a*vnoise(x*f,y*f,z*f); f*=2.03; a*=0.5; } return s; }
+function canvasTex(w,h,draw,srgb=true){
+  const cv=document.createElement('canvas'); cv.width=w; cv.height=h; draw(cv.getContext('2d'),w,h);
+  const t=new THREE.CanvasTexture(cv); if(srgb) t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+}
+
+// Crinkled multi-layer insulation (MLI) foil: bump map of random folds
+const mliBump = canvasTex(512,512,(g,w,h)=>{
+  g.fillStyle='#808080'; g.fillRect(0,0,w,h);
+  for(let i=0;i<900;i++){
+    const x=Math.random()*w, y=Math.random()*h, a=Math.random()*Math.PI, l=20+Math.random()*90;
+    g.strokeStyle=`rgba(${Math.random()<.5?255:0},${Math.random()<.5?255:0},${Math.random()<.5?255:0},${0.05+Math.random()*0.12})`;
+    g.lineWidth=1+Math.random()*5;
+    g.beginPath(); g.moveTo(x,y); g.lineTo(x+Math.cos(a)*l, y+Math.sin(a)*l); g.stroke();
+  }
+  // tape seams
+  g.fillStyle='rgba(255,255,255,.25)'; g.fillRect(0,h*0.5-3,w,6); g.fillRect(w*0.5-3,0,6,h);
+}, false);
+mliBump.wrapS = mliBump.wrapT = THREE.RepeatWrapping;
+
+// Solar cells: dark blue cells, silver busbars, white substrate gaps
+const cellTex = canvasTex(1024,768,(g,w,h)=>{
+  g.fillStyle='#d9dde2'; g.fillRect(0,0,w,h);
+  const cols=16, rows=12, pad=3, cw=w/cols, ch=h/rows;
+  for(let i=0;i<cols;i++) for(let j=0;j<rows;j++){
+    const x=i*cw+pad, y=j*ch+pad, ww=cw-2*pad, hh=ch-2*pad;
+    const grd=g.createLinearGradient(x,y,x+ww,y+hh);
+    const b=18+Math.random()*8; grd.addColorStop(0,`rgb(${b},${b+14},${b+48})`); grd.addColorStop(1,`rgb(${b-6},${b+6},${b+34})`);
+    g.fillStyle=grd; g.fillRect(x,y,ww,hh);
+    g.fillStyle='rgba(190,200,215,.55)';
+    for(let k=1;k<4;k++) g.fillRect(x+ww*k/4-0.6,y,1.2,hh);
+    g.fillRect(x,y+hh*0.5-0.5,ww,1);
+  }
+});
+const cellRough = canvasTex(1024,768,(g,w,h)=>{ g.fillStyle='#2a2a2a'; g.fillRect(0,0,w,h); }, false);
+
+// Earth: equirectangular, 3D noise sampled on the sphere so there is no seam
+function earthTextures(){
+  const W=1024, H=512;
+  const cvC=document.createElement('canvas'); cvC.width=W; cvC.height=H;
+  const cvA=document.createElement('canvas'); cvA.width=W; cvA.height=H;
+  const gc=cvC.getContext('2d'), ga=cvA.getContext('2d');
+  const ic=gc.createImageData(W,H), ia=ga.createImageData(W,H);
+  for(let y=0;y<H;y++){
+    const lat=(0.5-y/H)*Math.PI, cl=Math.cos(lat), sl=Math.sin(lat);
+    for(let x=0;x<W;x++){
+      const lon=x/W*Math.PI*2, px=cl*Math.cos(lon), py=sl, pz=cl*Math.sin(lon);
+      const e=fbm(px*1.6+7,py*1.6+3,pz*1.6+11,6);
+      const m=fbm(px*3+21,py*3+5,pz*3+2,4);
+      const c=fbm(px*2.4+40,py*5.0+9,pz*2.4+17,6);
+      const i=(y*W+x)*4; let r,g,b;
+      const polar=Math.abs(lat)>1.22+0.08*(m-0.5);
+      if(polar){ r=232;g=236;b=240; }
+      else if(e>0.53){ // land
+        const t=Math.min(1,(e-0.53)*6), dry=Math.max(0,1-Math.abs(lat)/0.55)*m;
+        r=72+70*dry+30*t; g=82+38*dry+10*t; b=46+20*dry; }
+      else { const d=(0.53-e)*4; r=10+8*(1-d); g=34+30*(1-d); b=72+40*(1-d); }
+      ic.data[i]=r; ic.data[i+1]=g; ic.data[i+2]=b; ic.data[i+3]=255;
+      let a=Math.max(0,Math.min(1,(c-0.5)*3.2)); a=a*a*(3-2*a);
+      ia.data[i]=255; ia.data[i+1]=255; ia.data[i+2]=255; ia.data[i+3]=a*235;
+    }
+  }
+  gc.putImageData(ic,0,0); ga.putImageData(ia,0,0);
+  const tc=new THREE.CanvasTexture(cvC); tc.colorSpace=THREE.SRGBColorSpace; tc.anisotropy=8;
+  const ta=new THREE.CanvasTexture(cvA); ta.colorSpace=THREE.SRGBColorSpace; ta.anisotropy=8;
+  return [tc,ta];
+}
+
+// ───────────────────────── materials ─────────────────────────
+const M = {
+  goldMLI: new THREE.MeshStandardMaterial({ color:0xc99a3c, metalness:1, roughness:0.32, bumpMap:mliBump, bumpScale:1.2, envMapIntensity:0.6 }),
+  silverMLI: new THREE.MeshStandardMaterial({ color:0xc6cacf, metalness:1, roughness:0.28, bumpMap:mliBump, bumpScale:1.0, envMapIntensity:0.6 }),
+  whitePaint: new THREE.MeshStandardMaterial({ color:0xe6e6e2, metalness:0, roughness:0.62, envMapIntensity:0.3 }),
+  blackAnod: new THREE.MeshStandardMaterial({ color:0x1b1c1f, metalness:0.4, roughness:0.48, envMapIntensity:0.4 }),
+  alu: new THREE.MeshStandardMaterial({ color:0xb4b8bd, metalness:1, roughness:0.38, envMapIntensity:0.5 }),
+  titanium: new THREE.MeshStandardMaterial({ color:0x8a8d91, metalness:1, roughness:0.45, envMapIntensity:0.5 }),
+  copper: new THREE.MeshStandardMaterial({ color:0xb8754a, metalness:1, roughness:0.3, envMapIntensity:0.6 }),
+  kapton: new THREE.MeshStandardMaterial({ color:0x9c5a1c, metalness:0.2, roughness:0.4, envMapIntensity:0.4 }),
+  glass: new THREE.MeshPhysicalMaterial({ color:0x0a0d14, metalness:0, roughness:0.05, clearcoat:1, clearcoatRoughness:0.03, envMapIntensity:1.0 }),
+  cells: new THREE.MeshPhysicalMaterial({ map:cellTex, metalness:0.15, roughness:0.22, clearcoat:0.8, clearcoatRoughness:0.08, envMapIntensity:0.9 }),
+  panelBack: new THREE.MeshStandardMaterial({ color:0xdcdcd6, metalness:0, roughness:0.75 }),
+  netMesh: new THREE.MeshStandardMaterial({ color:0xd8d2c2, metalness:0, roughness:0.9 }),
+  ceramic: new THREE.MeshStandardMaterial({ color:0xd8d4cc, metalness:0, roughness:0.55 }),
+};
+
+// ───────────────────────── spacecraft ─────────────────────────
+const craft = new THREE.Group(); scene.add(craft);
+const parts = {};   // id -> { group, base, dir, anchor, info }
+function part(id, info, explodeDir, anchor){
+  const g = new THREE.Group(); g.userData.part = id; craft.add(g);
+  parts[id] = { group:g, base:new THREE.Vector3(), dir:explodeDir.clone(), anchor:anchor.clone(), info };
+  return g;
+}
+function mesh(geo, mat, parent, pos=[0,0,0], rot=[0,0,0]){
+  const m = new THREE.Mesh(geo, mat); m.position.set(...pos); m.rotation.set(...rot);
+  m.castShadow = true; m.receiveShadow = true; parent.add(m); return m;
+}
+const BX=1.8, BY=1.4, BZ=1.5;   // bus size (m): x across, y up, z along flight/front
+
+// Bus
+const bus = part('bus', {
+  name:'Spacecraft bus', tag:'V1 core',
+  text:'Aluminium honeycomb structure wrapped in multi-layer insulation. It houses the avionics, power electronics, propellant tank and the internal debris storage bay.',
+  specs:[['Dry mass','~383 kg'],['Stowed size','2.4 × 1.8 × 1.8 m'],['Orbit','550 km SSO'],['Design life','5–7 yr']]
+}, new THREE.Vector3(0,0,0), new THREE.Vector3(-BX/2, BY/2, 0));
+mesh(new THREE.BoxGeometry(BX,BY,BZ), [M.goldMLI,M.goldMLI,M.silverMLI,M.goldMLI,M.goldMLI,M.goldMLI], bus);
+// white radiator panels on ±y faces
+mesh(new THREE.BoxGeometry(BX*0.86,0.012,BZ*0.8), M.whitePaint, bus, [0, BY/2+0.007, 0]);
+mesh(new THREE.BoxGeometry(BX*0.86,0.012,BZ*0.8), M.whitePaint, bus, [0,-BY/2-0.007, 0]);
+// structural edge rails
+for(const sx of [-1,1]) for(const sy of [-1,1]) mesh(new THREE.BoxGeometry(0.035,0.035,BZ+0.02), M.titanium, bus, [sx*BX/2, sy*BY/2, 0]);
+// RCS thruster quads on four corners
+for(const sx of [-1,1]) for(const sz of [-1,1]){
+  const q = new THREE.Group(); q.position.set(sx*(BX/2+0.04), -BY/2+0.12, sz*(BZ/2-0.14)); bus.add(q);
+  mesh(new THREE.BoxGeometry(0.08,0.08,0.08), M.blackAnod, q);
+  for(const [dx,dy,dz,rx,rz] of [[0.06,0,0,0,-Math.PI/2],[0,-0.06,0,Math.PI,0],[0,0,sz*0.06,sz*Math.PI/2,0]])
+    mesh(new THREE.CylinderGeometry(0.008,0.018,0.04,12), M.titanium, q, [sx*dx,dy,dz], [rx,0,sx*rz]);
+}
+
+// Solar array wings (±x), each: yoke + 3 panels; rotate about x to track the sun
+function wing(id, side){
+  const g = part(id, {
+    name: side>0?'Solar array wing (starboard)':'Solar array wing (port)', tag:'V1 core',
+    text:'Triple-junction GaAs cells on carbon-fibre panels. The wing rotates on its drive to keep the cells facing the Sun.',
+    specs:[['Cells','Triple-junction GaAs'],['Array output','1.4 kW BOL (both wings)'],['Panels','3 per wing']]
+  }, new THREE.Vector3(side*1.6,0,0), new THREE.Vector3(side*4.2, 0.55, 0));
+  g.position.set(side*BX/2, 0.15, 0);
+  const drive = mesh(new THREE.CylinderGeometry(0.07,0.07,0.12,24), M.alu, g, [side*0.06,0,0], [0,0,Math.PI/2]);
+  const pivot = new THREE.Group(); g.add(pivot); g.userData.pivot = pivot;
+  // yoke rods
+  for(const z of [-0.35,0.35]) mesh(new THREE.CylinderGeometry(0.012,0.012,0.95,10), M.titanium, pivot, [side*0.6,0,z*0.6], [0,side*(z>0?-0.42:0.42),Math.PI/2]);
+  const PW=1.15, PL=0.95, T=0.028;
+  for(let i=0;i<3;i++){
+    const x = side*(1.1 + PW/2 + i*(PW+0.05));
+    const panel = new THREE.Group(); panel.position.set(x,0,0); pivot.add(panel);
+    mesh(new THREE.BoxGeometry(PW,T,PL), [M.panelBack,M.panelBack,M.cells,M.panelBack,M.panelBack,M.panelBack], panel);
+    mesh(new THREE.BoxGeometry(PW,T*1.4,0.02), M.alu, panel, [0,0,PL/2]);
+    mesh(new THREE.BoxGeometry(PW,T*1.4,0.02), M.alu, panel, [0,0,-PL/2]);
+    if(i<2) for(const z of [-0.3,0.3]) mesh(new THREE.CylinderGeometry(0.014,0.014,0.06,10), M.alu, panel, [side*(PW/2+0.025),0,z], [0,0,Math.PI/2]);
+  }
+  return g;
+}
+wing('wingR', 1); wing('wingL', -1);
+
+// High-gain antenna on a boom (top, aft)
+const hga = part('hga', {
+  name:'High-gain antenna', tag:'V1 core',
+  text:'Steerable X-band dish for telemetry and encounter data downlink.',
+  specs:[['Diameter','0.32 m (design)'],['Band','X-band'],['Downlink','150 Mbps target']]
+}, new THREE.Vector3(0,1.2,-0.6), new THREE.Vector3(-0.35, BY/2+1.05, -0.5));
+hga.position.set(-0.35, BY/2, -0.5);
+mesh(new THREE.CylinderGeometry(0.025,0.025,0.7,12), M.titanium, hga, [0,0.35,0]);
+mesh(new THREE.CylinderGeometry(0.05,0.05,0.08,20), M.blackAnod, hga, [0,0.72,0]);
+const dishG = new THREE.Group(); dishG.position.set(0,0.8,0); dishG.rotation.set(-0.9,0.4,0); hga.add(dishG);
+{ const pts=[]; for(let i=0;i<=24;i++){ const r=i/24*0.32; pts.push(new THREE.Vector2(r, r*r*0.9)); }
+  const dish = mesh(new THREE.LatheGeometry(pts,64), M.whitePaint, dishG); dish.material = M.whitePaint.clone(); dish.material.side = THREE.DoubleSide;
+  for(let k=0;k<3;k++){ const a=k*Math.PI*2/3; const s = mesh(new THREE.CylinderGeometry(0.006,0.006,0.3,6), M.titanium, dishG, [Math.cos(a)*0.15,0.2,Math.sin(a)*0.15]); s.lookAt(dishG.localToWorld(new THREE.Vector3(0,0.34,0))); s.rotateX(Math.PI/2); }
+  mesh(new THREE.CylinderGeometry(0.025,0.035,0.06,16), M.blackAnod, dishG, [0,0.34,0]); }
+
+// Front face (+z): electron beam gun with V2 phased micro-emitter array
+const egun = part('egun', {
+  name:'Electron beam gun', tag:'V1 core · upgraded in V2',
+  text:'Fires a focused electron beam to charge small fragments (1–10 cm), so the field panels can pull them into the collection bay. Larger objects are left to the net arm. V2 replaces the gimbal with a 4 × 4 array of electronically steered micro-emitters.',
+  specs:[['Beam energy','0.5–5 keV'],['Range target','0.5–8 m'],['V2 steering','±45°, no gimbal']]
+}, new THREE.Vector3(0,0,1.4), new THREE.Vector3(0.25, 0.1, BZ/2+0.45));
+egun.position.set(0.25, 0.1, BZ/2);
+mesh(new THREE.CylinderGeometry(0.16,0.18,0.14,40), M.alu, egun, [0,0,0.07], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.11,0.15,0.22,40), M.blackAnod, egun, [0,0,0.24], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.115,0.115,0.03,40), M.copper, egun, [0,0,0.2], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.05,0.08,0.08,32), M.titanium, egun, [0,0,0.39], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.035,0.035,0.012,32), M.glass, egun, [0,0,0.435], [Math.PI/2,0,0]);
+// phased array plate
+{ const arr = new THREE.Group(); arr.position.set(-0.52,0.22,0.012); egun.add(arr);
+  mesh(new THREE.BoxGeometry(0.36,0.36,0.02), M.blackAnod, arr);
+  for(let i=0;i<4;i++) for(let j=0;j<4;j++){ mesh(new THREE.CylinderGeometry(0.026,0.03,0.03,6), M.titanium, arr, [-0.12+i*0.08,-0.12+j*0.08,0.025], [Math.PI/2,0,0]); mesh(new THREE.CylinderGeometry(0.014,0.014,0.006,12), M.glass, arr, [-0.12+i*0.08,-0.12+j*0.08,0.042], [Math.PI/2,0,0]); } }
+
+// UV emitter
+const uv = part('uv', {
+  name:'UV photon emitter', tag:'V1 core',
+  text:'Deep-UV source that frees photoelectrons from debris surfaces, used to change the charge on targets the electron beam handles poorly.',
+  specs:[['Wavelength','185–254 nm'],['Power','~15 W (design)']]
+}, new THREE.Vector3(0,0,1.1), new THREE.Vector3(-0.55,-0.35,BZ/2+0.3));
+uv.position.set(-0.55,-0.35,BZ/2);
+mesh(new THREE.BoxGeometry(0.2,0.16,0.18), M.blackAnod, uv, [0,0,0.09]);
+mesh(new THREE.CylinderGeometry(0.05,0.05,0.12,24), M.alu, uv, [0,0,0.24], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.04,0.04,0.01,24), new THREE.MeshPhysicalMaterial({ color:0x1a1030, roughness:0.05, clearcoat:1 }), uv, [0,0,0.305], [Math.PI/2,0,0]);
+
+// Sensor head: optical camera, LIDAR, SPINDAR (V2)
+const sensors = part('sensors', {
+  name:'Sensor head', tag:'V1 core',
+  text:'Optical camera, scanning LIDAR and a radar altimeter. Detects debris, estimates its trajectory and tumble rate, and guides approach.',
+  specs:[['Camera','16 MP (design)'],['LIDAR','360° scanning'],['Function','Detect, track, classify']]
+}, new THREE.Vector3(0,0.9,0.9), new THREE.Vector3(0.6, BY/2+0.35, BZ/2-0.2));
+sensors.position.set(0.55, BY/2, BZ/2-0.25);
+mesh(new THREE.BoxGeometry(0.34,0.06,0.34), M.alu, sensors, [0,0.03,0]);
+mesh(new THREE.CylinderGeometry(0.11,0.11,0.12,40), M.blackAnod, sensors, [0,0.12,0]);
+mesh(new THREE.CylinderGeometry(0.112,0.112,0.05,40,1,true), M.glass, sensors, [0,0.15,0]);
+mesh(new THREE.CylinderGeometry(0.09,0.11,0.03,40), M.alu, sensors, [0,0.2,0]);
+{ const cam = new THREE.Group(); cam.position.set(-0.08,0.1,0.17); sensors.add(cam);
+  mesh(new THREE.BoxGeometry(0.12,0.1,0.12), M.blackAnod, cam);
+  mesh(new THREE.CylinderGeometry(0.035,0.042,0.1,24), M.blackAnod, cam, [0,0,0.1], [Math.PI/2,0,0]);
+  mesh(new THREE.CylinderGeometry(0.03,0.03,0.005,24), M.glass, cam, [0,0,0.152], [Math.PI/2,0,0]); }
+
+const spindar = part('spindar', {
+  name:'SPINDAR material sensor', tag:'V2 proposal', v2:true,
+  text:'Proposed nitrogen-vacancy diamond magnetometer intended to identify debris material before approach. The feasibility check rates it doubtful at the 5–15 m target range.',
+  specs:[['Target range','5–15 m'],['Sensor','NV-centre diamond'],['Status','Untested concept']]
+}, new THREE.Vector3(0.6,0.6,0.6), new THREE.Vector3(0.88, BY/2+0.2, BZ/2-0.05));
+spindar.position.set(0.82, BY/2+0.06, BZ/2-0.1);
+mesh(new THREE.OctahedronGeometry(0.06,0), M.alu, spindar, [0,0.08,0]);
+mesh(new THREE.CylinderGeometry(0.04,0.05,0.06,6), M.blackAnod, spindar, [0,0.01,0]);
+
+// Electrostatic field panels: four copper plates on hinged booms around the front face
+const panels = part('panels', {
+  name:'Electrostatic field panels', tag:'V1 core',
+  text:'Four conductive plates that set up the electric field used to attract or repel a charged object. Holding them at high voltage in LEO plasma is the main power problem found in the feasibility check.',
+  specs:[['Voltage','±20 kV (design)'],['Count','4 plates'],['Force at 10 m','~0.2 mN (analysis)']]
+}, new THREE.Vector3(0,0,0.9), new THREE.Vector3(BX/2+0.55, -BY/2-0.25, BZ/2+0.35));
+for(const [sx,sy] of [[1,1],[1,-1],[-1,1],[-1,-1]]){
+  const arm = new THREE.Group(); arm.position.set(sx*(BX/2-0.05), sy*(BY/2-0.05), BZ/2); panels.add(arm);
+  mesh(new THREE.CylinderGeometry(0.03,0.03,0.06,16), M.titanium, arm, [0,0,0], [0,0,Math.PI/2]);
+  const plate = new THREE.Group(); plate.position.set(sx*0.32, sy*0.22, 0.28); plate.rotation.set(-sy*0.5, sx*0.55, 0); arm.add(plate);
+  mesh(new THREE.BoxGeometry(0.62,0.42,0.018), M.copper, plate);
+  mesh(new THREE.BoxGeometry(0.66,0.46,0.01), M.ceramic, plate, [0,0,-0.016]);
+  const boom = mesh(new THREE.CylinderGeometry(0.014,0.014,0.5,10), M.titanium, arm);
+  boom.position.set(sx*0.16, sy*0.11, 0.14); boom.lookAt(arm.localToWorld(plate.position.clone())); boom.rotateX(Math.PI/2);
+}
+
+// Net capture arm (V1) with ELECTROSKIN tiles (V2) on top deck
+const arm = part('arm', {
+  name:'Net capture arm', tag:'V1 core',
+  text:'Three-joint arm carrying a folded 3 × 3 m net for objects too large for electrostatic handling. Shown stowed.',
+  specs:[['Joints','3-DOF'],['Net','3 × 3 m Dyneema + copper mesh'],['Use','Objects > 10 cm']]
+}, new THREE.Vector3(-0.8,1.0,0), new THREE.Vector3(-0.55, BY/2+0.55, 0.25));
+arm.position.set(-0.45, BY/2, 0.2);
+mesh(new THREE.CylinderGeometry(0.1,0.12,0.08,32), M.alu, arm, [0,0.04,0]);
+mesh(new THREE.CylinderGeometry(0.07,0.07,0.12,24), M.blackAnod, arm, [0,0.12,0]);
+{ const s1 = new THREE.Group(); s1.position.set(0,0.18,0); s1.rotation.set(0,0,0.25); arm.add(s1);
+  mesh(new THREE.CylinderGeometry(0.035,0.035,0.7,16), M.whitePaint, s1, [0,0.35,0]);
+  mesh(new THREE.SphereGeometry(0.055,20,12), M.blackAnod, s1, [0,0.72,0]);
+  const s2 = new THREE.Group(); s2.position.set(0,0.72,0); s2.rotation.set(0,0,-2.0); s1.add(s2);
+  mesh(new THREE.CylinderGeometry(0.03,0.03,0.6,16), M.whitePaint, s2, [0,0.3,0]);
+  mesh(new THREE.SphereGeometry(0.045,20,12), M.blackAnod, s2, [0,0.62,0]);
+  const can = new THREE.Group(); can.position.set(0,0.72,0); s2.add(can);
+  mesh(new THREE.CylinderGeometry(0.11,0.11,0.2,32), M.silverMLI, can);
+  mesh(new THREE.CylinderGeometry(0.115,0.115,0.02,32), M.alu, can, [0,0.1,0]); }
+
+const skin = part('skin', {
+  name:'ELECTROSKIN adhesion tiles', tag:'V2 proposal', v2:true,
+  text:'Proposed net tiles whose grip can be switched by voltage (electrowetting with an ionic liquid), to stop tumbling objects bouncing out. Works at contact range, so plasma screening does not limit it; vacuum and UV survival are untested.',
+  specs:[['Tiles','3 × 3 grid, 9 × 9 cm'],['Switching','< 2 ms target'],['Status','Untested concept']]
+}, new THREE.Vector3(-0.9,0.5,0.6), new THREE.Vector3(-BX/2-0.05, 0.25, BZ/2-0.3));
+skin.position.set(-BX/2-0.006, 0.2, 0.25);
+for(let i=0;i<3;i++) for(let j=0;j<3;j++) mesh(new THREE.BoxGeometry(0.01,0.085,0.085), new THREE.MeshStandardMaterial({ color:0x2b3138, metalness:0.6, roughness:0.25 }), skin, [0, -0.1+i*0.1, -0.1+j*0.1]);
+
+// Hall thruster (aft, -z)
+const thruster = part('thruster', {
+  name:'Hall-effect thruster', tag:'V1 core',
+  text:'Xenon Hall thruster for orbit changes, also used to neutralise the spacecraft charge after a capture.',
+  specs:[['Propellant','Xenon'],['Thrust','~90 mN (design)'],['Peak power','~180 W (design)']]
+}, new THREE.Vector3(0,0,-1.2), new THREE.Vector3(0,-0.1,-BZ/2-0.35));
+thruster.position.set(0,-0.1,-BZ/2);
+mesh(new THREE.CylinderGeometry(0.2,0.22,0.06,48), M.titanium, thruster, [0,0,-0.03], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.17,0.17,0.12,48), M.blackAnod, thruster, [0,0,-0.12], [Math.PI/2,0,0]);
+mesh(new THREE.TorusGeometry(0.12,0.025,16,48), M.ceramic, thruster, [0,0,-0.18]);
+mesh(new THREE.CylinderGeometry(0.07,0.07,0.02,32), M.titanium, thruster, [0,0,-0.185], [Math.PI/2,0,0]);
+mesh(new THREE.CylinderGeometry(0.03,0.03,0.16,16), M.alu, thruster, [0.26,0.05,-0.08], [Math.PI/2,0,0]);
+
+// Storage bay hatch (-y face)
+const bay = part('bay', {
+  name:'Debris storage bay', tag:'V1 core',
+  text:'Internal bay with a compactor for captured objects, emptied by controlled re-entry or transfer to a depot.',
+  specs:[['Volume','0.12 m³ (design)'],['Disposal','Re-entry, storage or depot']]
+}, new THREE.Vector3(0,-1.0,0), new THREE.Vector3(0.2, -BY/2-0.15, -0.2));
+bay.position.set(0.2, -BY/2-0.012, -0.15);
+mesh(new THREE.BoxGeometry(0.8,0.02,0.7), M.alu, bay);
+for(const z of [-0.33,0.33]) mesh(new THREE.BoxGeometry(0.82,0.03,0.03), M.titanium, bay, [0,-0.01,z]);
+mesh(new THREE.CylinderGeometry(0.02,0.02,0.82,12), M.titanium, bay, [0,-0.02,0.36], [0,0,Math.PI/2]);
+
+// MYCENET tether canister (V2, top deck aft) + deployable tethers
+const myce = part('myce', {
+  name:'MYCENET tether canister', tag:'V2 proposal', v2:true,
+  text:'Proposed canister deploying nine charged 50 µm carbon-nanotube filaments up to 200 m. The feasibility check found encounters far too rare and crossing fragments would cut the filaments; a conductive tether is better used as an electrodynamic deorbit tether.',
+  specs:[['Filaments','9 × 200 m (design)'],['Diameter','50 µm'],['Status','Not viable as designed']]
+}, new THREE.Vector3(0.5,1.0,-0.6), new THREE.Vector3(0.45, BY/2+0.3, -0.45));
+myce.position.set(0.45, BY/2, -0.45);
+mesh(new THREE.CylinderGeometry(0.12,0.13,0.22,40), M.silverMLI, myce, [0,0.11,0]);
+mesh(new THREE.CylinderGeometry(0.125,0.125,0.02,40), M.alu, myce, [0,0.23,0]);
+for(let k=0;k<9;k++){ const a=k/9*Math.PI*2; mesh(new THREE.CylinderGeometry(0.008,0.008,0.02,8), M.titanium, myce, [Math.cos(a)*0.08,0.25,Math.sin(a)*0.08]); }
+const tethers = new THREE.Group(); myce.add(tethers);
+const tetherDirs = [];
+for(let k=0;k<9;k++){ const a=k/9*Math.PI*2; tetherDirs.push(new THREE.Vector3(Math.cos(a)*0.8, 0.35+0.3*Math.sin(k*1.7), Math.sin(a)*0.8).normalize()); }
+const tetherMat = new THREE.LineBasicMaterial({ color:0xb8bec6, transparent:true, opacity:0.35 });
+const tetherLines = tetherDirs.map((d,k)=>{ const geo=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(Math.cos(k/9*Math.PI*2)*0.08,0.25,Math.sin(k/9*Math.PI*2)*0.08), new THREE.Vector3()]); const l=new THREE.Line(geo,tetherMat); tethers.add(l); return l; });
+
+// NEUROTRIAGE module (V2)
+const neuro = part('neuro', {
+  name:'NEUROTRIAGE processor', tag:'V2 proposal', v2:true,
+  text:'Proposed neuromorphic (spiking neural network) co-processor that recommends a capture strategy from sensor events. Plausible, but computing is a small share of the power budget.',
+  specs:[['Type','Spiking neural network'],['Shielding','1 mm W-Cu (design)'],['Mass','~0.42 kg (design)']]
+}, new THREE.Vector3(-0.6,0.8,-0.6), new THREE.Vector3(-0.15, BY/2+0.15, -0.55));
+neuro.position.set(-0.05, BY/2+0.01, -0.55);
+mesh(new THREE.BoxGeometry(0.24,0.06,0.18), M.titanium, neuro, [0,0.03,0]);
+for(let k=0;k<7;k++) mesh(new THREE.BoxGeometry(0.008,0.04,0.16), M.alu, neuro, [-0.1+k*0.033,0.08,0]);
+
+// STIGMA aft beacon (V2)
+const stigma = part('stigma', {
+  name:'STIGMA beacon', tag:'V2 proposal', v2:true,
+  text:'Proposed beacon for coordinating several probes without radio links, partly by leaving charge marks on debris. In LEO such marks would be neutralised by the plasma in well under a second.',
+  specs:[['Proximity range','2 km (design)'],['Power','~0.8 W'],['Status','Not viable as designed']]
+}, new THREE.Vector3(0.6,0.4,-1.0), new THREE.Vector3(0.6, 0.4, -BZ/2-0.15));
+stigma.position.set(0.6, 0.4, -BZ/2);
+mesh(new THREE.CylinderGeometry(0.07,0.07,0.03,32), M.alu, stigma, [0,0,-0.015], [Math.PI/2,0,0]);
+mesh(new THREE.SphereGeometry(0.06,32,16,0,Math.PI*2,0,Math.PI/2), M.ceramic, stigma, [0,0,-0.03], [-Math.PI/2,0,0]);
+
+// Star trackers (detail, not selectable)
+for(const [x,z,ry] of [[-0.75,-0.65,0.6],[-0.75,-0.35,-0.6]]){
+  const st = new THREE.Group(); st.position.set(x, BY/2, z); st.rotation.y = ry; bus.add(st);
+  mesh(new THREE.BoxGeometry(0.1,0.08,0.1), M.blackAnod, st, [0,0.04,0]);
+  const baffle = mesh(new THREE.CylinderGeometry(0.05,0.035,0.12,24,1,true), M.blackAnod, st, [0,0.14,0.03], [0.5,0,0]);
+  baffle.material = M.blackAnod.clone(); baffle.material.side = THREE.DoubleSide;
+}
+
+for(const p of Object.values(parts)) p.base.copy(p.group.position);
+
+// ───────────────────────── Earth, atmosphere, stars ─────────────────────────
+const R = 220;
+const earth = new THREE.Group(); earth.position.set(0, -R-9, -55); earth.rotation.z = 0.35; scene.add(earth);
+const [earthMap, cloudMap] = earthTextures();
+const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(R,128,96), new THREE.MeshStandardMaterial({ map:earthMap, roughness:0.85, metalness:0, envMapIntensity:0 }));
+earth.add(earthMesh);
+const clouds = new THREE.Mesh(new THREE.SphereGeometry(R*1.006,128,96), new THREE.MeshStandardMaterial({ map:cloudMap, transparent:true, roughness:1, metalness:0, depthWrite:false, envMapIntensity:0 }));
+earth.add(clouds);
+const atmo = new THREE.Mesh(new THREE.SphereGeometry(R*1.035,128,96), new THREE.ShaderMaterial({
+  uniforms:{ sunDir:{ value:SUN_DIR } },
+  vertexShader:`varying vec3 vN; varying vec3 vW; void main(){ vN=normalize(normalMatrix*normal); vW=normalize((modelMatrix*vec4(normal,0.0)).xyz); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`uniform vec3 sunDir; varying vec3 vN; varying vec3 vW; void main(){ float rim=pow(clamp(0.72-dot(vN,vec3(0.0,0.0,1.0)),0.0,1.0),3.0); float lit=clamp(dot(vW,sunDir)*0.8+0.35,0.0,1.0); gl_FragColor=vec4(vec3(0.35,0.6,1.0)*rim*lit*1.6, rim*lit); }`,
+  side:THREE.BackSide, blending:THREE.AdditiveBlending, transparent:true, depthWrite:false
+}));
+earth.add(atmo);
+
+{ const N=4000, pos=new Float32Array(N*3), col=new Float32Array(N*3);
+  for(let i=0;i<N;i++){ const v=new THREE.Vector3().randomDirection().multiplyScalar(1500); pos.set([v.x,v.y,v.z],i*3); const b=0.25+Math.pow(Math.random(),6)*0.9, t=Math.random(); col.set([b*(0.9+0.1*t), b*0.95, b*(0.9+0.15*(1-t))], i*3); }
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(pos,3)); g.setAttribute('color',new THREE.BufferAttribute(col,3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ size:1.3, sizeAttenuation:false, vertexColors:true, transparent:true, depthWrite:false }))); }
+
+// ───────────────────────── UI ─────────────────────────
+const order = ['bus','wingR','wingL','sensors','egun','uv','panels','arm','bay','thruster','hga','spindar','skin','myce','neuro','stigma'];
+const listEl = document.getElementById('list'), infoEl = document.getElementById('info'), labelsEl = document.getElementById('labels'), leaders = document.getElementById('leaders');
+let selected = null;
+function buildList(){
+  let html = '<div class="grp">Core spacecraft · V1</div>';
+  for(const id of order.filter(i=>!parts[i].info.v2)) html += `<div class="item" data-id="${id}">${parts[id].info.name}<small>V1</small></div>`;
+  html += '<div class="grp">Proposed additions · V2</div>';
+  for(const id of order.filter(i=>parts[i].info.v2)) html += `<div class="item" data-id="${id}">${parts[id].info.name}<small>V2</small></div>`;
+  listEl.innerHTML = html;
+  listEl.querySelectorAll('.item').forEach(el=>el.addEventListener('click',()=>select(el.dataset.id)));
+}
+buildList();
+const LABELED = ['wingR','sensors','egun','panels','arm','thruster','hga','myce','spindar','stigma','uv','bay'];
+const labelEls = {};
+for(const id of LABELED){ const d=document.createElement('div'); d.className='lbl'+(parts[id].info.v2?' v2':''); d.textContent=parts[id].info.name.replace(' (starboard)',''); labelsEl.appendChild(d); labelEls[id]=d; }
+
+const highlight = new Map();
+function setHighlight(id){
+  for(const [m,orig] of highlight){ m.material = orig; } highlight.clear();
+  if(!id) return;
+  parts[id].group.traverse(o=>{ if(o.isMesh){ const orig=o.material; const mats=Array.isArray(orig)?orig:[orig];
+    const hl=mats.map(mm=>{ const c=mm.clone(); if(c.emissive){ c.emissive=new THREE.Color(0xd9b36c); c.emissiveIntensity=0.22; } return c; });
+    o.material = Array.isArray(orig)?hl:hl[0]; highlight.set(o,orig); } });
+}
+const camGoal = { target:null, pos:null };
+function select(id){
+  selected = (selected===id) ? null : id;
+  listEl.querySelectorAll('.item').forEach(el=>el.classList.toggle('on', el.dataset.id===selected));
+  setHighlight(selected);
+  if(!selected){ infoEl.classList.remove('show'); return; }
+  const inf = parts[selected].info;
+  infoEl.innerHTML = `<div class="tag">${inf.tag}</div><h2>${inf.name}</h2><p>${inf.text}</p><table>${inf.specs.map(([k,v])=>`<tr><td>${k}</td><td>${v}</td></tr>`).join('')}</table><div class="note">Figures are design targets unless marked as analysis.</div>`;
+  infoEl.classList.add('show');
+  const a = currentAnchor(selected);
+  camGoal.target = a.clone();
+  const off = camera.position.clone().sub(controls.target).normalize().multiplyScalar(5.5);
+  camGoal.pos = a.clone().add(off);
+}
+function currentAnchor(id){ const p=parts[id]; return p.anchor.clone().add(p.dir.clone().multiplyScalar(explodeT)); }
+
+// picking
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2(); let downAt = null;
+canvas.addEventListener('pointerdown', e=>{ downAt=[e.clientX,e.clientY]; });
+canvas.addEventListener('pointerup', e=>{
+  if(!downAt || Math.hypot(e.clientX-downAt[0], e.clientY-downAt[1])>5) return;
+  mouse.set(e.clientX/innerWidth*2-1, -(e.clientY/innerHeight)*2+1); ray.setFromCamera(mouse, camera);
+  const hit = ray.intersectObject(craft, true)[0];
+  if(!hit){ if(selected) select(selected); return; }
+  let o = hit.object; while(o && !o.userData.part) o = o.parent;
+  if(o) select(o.userData.part);
+});
+
+// buttons
+let showLabels = true, exploded = false, tetherOut = false, explodeT = 0, tetherT = 0;
+const $ = id=>document.getElementById(id);
+$('bLabels').onclick = e=>{ showLabels=!showLabels; e.currentTarget.classList.toggle('on',showLabels); };
+$('bExplode').onclick = e=>{ exploded=!exploded; e.currentTarget.classList.toggle('on',exploded); };
+$('bTether').onclick = e=>{ tetherOut=!tetherOut; e.currentTarget.classList.toggle('on',tetherOut); };
+$('bRotate').onclick = e=>{ controls.autoRotate=!controls.autoRotate; e.currentTarget.classList.toggle('on',controls.autoRotate); };
+$('bReset').onclick = ()=>{ camGoal.target=new THREE.Vector3(); camGoal.pos=HOME_POS.clone(); if(selected) select(selected); };
+controls.addEventListener('start', ()=>{ camGoal.target=null; camGoal.pos=null; });
+
+// ───────────────────────── loop ─────────────────────────
+const clock = new THREE.Clock(); const tmp = new THREE.Vector3();
+function frame(){
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  earthMesh.rotation.y += dt*0.004; clouds.rotation.y += dt*0.0052;
+  // solar arrays slowly track the sun
+  for(const id of ['wingR','wingL']) parts[id].group.userData.pivot.rotation.x = 0.35 + Math.sin(t*0.05)*0.08;
+  // exploded view
+  explodeT += ((exploded?1:0) - explodeT) * Math.min(1, dt*3);
+  for(const p of Object.values(parts)) p.group.position.copy(p.base).addScaledVector(p.dir, explodeT);
+  // tethers
+  tetherT += ((tetherOut?1:0) - tetherT) * Math.min(1, dt*0.8);
+  tethers.visible = tetherT > 0.01;
+  tetherLines.forEach((l,k)=>{ const a=l.geometry.attributes.position; const s=new THREE.Vector3(a.getX(0),a.getY(0),a.getZ(0)); const e=s.clone().addScaledVector(tetherDirs[k], 0.3+tetherT*60); a.setXYZ(1,e.x,e.y,e.z); a.needsUpdate=true; });
+  // camera easing
+  if(camGoal.target){ controls.target.lerp(camGoal.target, Math.min(1,dt*3)); if(controls.target.distanceTo(camGoal.target)<0.01) camGoal.target=null; }
+  if(camGoal.pos){ camera.position.lerp(camGoal.pos, Math.min(1,dt*3)); if(camera.position.distanceTo(camGoal.pos)<0.02) camGoal.pos=null; }
+  controls.update();
+  renderer.render(scene, camera);
+  // labels + leader lines
+  let svg = '';
+  for(const id of LABELED){
+    const el = labelEls[id]; const vis = showLabels && (!selected || selected===id);
+    tmp.copy(currentAnchor(id)).project(camera);
+    if(!vis || tmp.z>1){ el.style.opacity=0; continue; }
+    const x=(tmp.x*0.5+0.5)*innerWidth, y=(-tmp.y*0.5+0.5)*innerHeight;
+    const right = tmp.x >= -0.05, lx = x + (right?46:-46), ly = y - 26;
+    el.style.opacity = 1; el.style.left = (right? lx+6 : lx-6-el.offsetWidth)+'px'; el.style.top = ly+'px';
+    svg += `<circle cx="${x}" cy="${y}" r="2" fill="rgba(255,255,255,.85)"/><polyline points="${x},${y} ${x+(right?18:-18)},${ly} ${lx},${ly}" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1"/>`;
+  }
+  leaders.innerHTML = svg;
+  requestAnimationFrame(frame);
+}
+addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); applyViewOffset(); renderer.setSize(innerWidth,innerHeight); });
+frame();
+const ld = document.getElementById('loading'); ld.style.opacity = 0; setTimeout(()=>ld.remove(), 900);
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you refer to this work, please cite it as below."
+title: "ESPIRA: Feasibility of Electrostatic Debris Removal in Low Earth Orbit"
+abstract: "A concept study for an electrostatic debris-removal spacecraft, a first-order physics assessment showing the concept is not viable in low Earth orbit, and a real-time mission visualisation."
+authors:
+  - family-names: Pandita
+    given-names: Harshita
+version: 1.0.0
+date-released: 2026-11-11
+url: "https://hersheyharshi.github.io/espira/"
+repository-code: "https://github.com/hersheyharshi/espira"
+license: MIT
+keywords:
+  - space debris
+  - active debris removal
+  - electrostatics
+  - spacecraft charging
+  - electrodynamic tether
+  - low Earth orbit
+  - scientific computing
+  - real-time rendering
+  - WebGL

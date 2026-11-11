@@ -1,0 +1,50 @@
+========================================================================
+1. HOW FAR DOES THE FIELD REACH?  (Debye length)
+========================================================================
+  LEO 400-550 km, dense (day)        lambda_D =     0.0033 m
+  LEO 400-550 km, sparse (night)     lambda_D =     0.0235 m
+  GEO quiet                          lambda_D =   235.0924 m
+  GEO storm (hot, thin)              lambda_D =  2350.9235 m
+  -> In LEO the plasma screens charge within millimetres-centimetres;
+     in GEO the field reaches hundreds of metres. LEO is NOT a vacuum for electrostatics.
+
+========================================================================
+2. CHARGE AND FORCE FROM ESPIRA's ±20 kV SYSTEM
+========================================================================
+  Vacuum (upper bound)           F(10 m)=2.22e-04 N  F(50 m)=8.89e-06 N  F(200 m)=5.56e-07 N
+  GEO quiet (Debye-screened)     F(10 m)=2.21e-04 N  F(50 m)=8.71e-06 N  F(200 m)=4.40e-07 N
+  LEO day (sheath ~15 m)         F(10 m)=2.22e-04 N  F(50 m)=0.00e+00 N  F(200 m)=0.00e+00 N
+  LEO night (sheath ~176 m)      F(10 m)=2.22e-04 N  F(50 m)=8.89e-06 N  F(200 m)=0.00e+00 N
+  Probe charge at 20 kV (R=1 m): 2.23 uC
+
+  Power needed just to HOLD the probe at 20 kV in LEO plasma (order of magnitude):
+    LEO day    sheath ~  14.8 m | at -20 kV:     19.2 kW | at +20 kV:      754.2 kW
+    LEO night  sheath ~ 176.3 m | at -20 kV:     24.0 kW | at +20 kV:      669.4 kW
+    ESPIRA solar array: 1.4 kW.  -> In LEO the limit is POWER, not range:
+    the plasma drains the charge faster than the array can replace it.
+
+========================================================================
+3. IS THE FORCE ENOUGH?  (delta-v budget, best case = vacuum force at 10 m)
+========================================================================
+  Push 100 kg debris for 1 hour  : delta-v = 7.974e-03 m/s
+  Push 100 kg debris for 1 day   : delta-v = 1.914e-01 m/s
+  Push 100 kg debris for 30 days : delta-v = 5.741e+00 m/s
+  Stop a crossing fragment (relative speed)                      needs  10000.0 m/s ->     143.05 years of continuous push
+  Lower 550 km circular orbit to fast-decay perigee (~200 km)    needs    100.0 m/s ->       1.43 years of continuous push
+  GEO graveyard re-orbit (+300 km)                               needs     11.0 m/s ->       0.16 years of continuous push
+  -> Even ignoring plasma screening, electrostatic force at 10 m is ~mN-scale:
+     useful for slow, co-orbital nudging/detumbling (GEO tractor concept),
+     hopeless for capturing objects that are moving relative to the probe.
+
+========================================================================
+4. MYCENET: encounter rate and what an encounter means
+========================================================================
+  >10 cm (guide's assumption)    encounters/yr =      56.8
+  >10 cm (realistic)             encounters/yr =   0.00568
+  1-10 cm                        encounters/yr =    0.0512
+  1 mm-1 cm                      encounters/yr =      0.52
+  Kinetic energy of a 1 cm Al sphere at 10 km/s: 71 kJ
+  Work electrostatic field can do over 200 m (best case): 4.43e-02 J
+  -> ratio 1.6e+06: a crossing fragment cannot be slowed; it would cut the filament.
+
+Figures saved to ./figures
